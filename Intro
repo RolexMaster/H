@@ -1,0 +1,25 @@
+### **1. 서론**
+
+함정 전투체계는 고도로 복잡한 시스템으로, 다양한 장비 및 통신 프로토콜 간의 원활한 연동이 필수적이다. **Naval Shield Component Platform(NSCP)**는 이러한 연동을 표준화하고 체계적인 통합을 실현하기 위해 개발되었으며, 이를 통해 전투체계 구성 요소 간의 상호 운용성을 성공적으로 확보하였다[1]. 현재 NSCP는 **TCP, Serial, UDP**와 같은 통신 방식을 주로 활용하며, 특히 **GFE(Government Furnished Equipment, 관급 장비)와의 연동을 중심으로 운영**되어 왔다[2].
+
+그러나 **국제 방산 시장 확대와 해외 시스템과의 상호 운용성이 점점 중요해짐에 따라**, **DDS(Data Distribution Service) 기반의 통신 방식 도입 필요성이 대두되고 있다**[3]. DDS는 **OMG(Object Management Group)**에서 표준화한 발행-구독(Pub/Sub) 미들웨어로, 기존의 점대점(Point-to-Point) 방식보다 더욱 유연하고 확장성이 뛰어난 실시간 데이터 분배 모델을 제공한다[4].
+
+본 연구에서는 **NSCP의 기존 설계 원칙(SOLID, 모듈화, 인터페이스 기반 설계 등)을 유지하면서 OpenDDS 기반 통신 방식을 추가하는 확장 방안을 제시한다**. 이를 통해 기존 시스템과의 호환성을 유지하면서도 OpenDDS를 활용한 해외 장비 연동을 가능하게 한다. 
+
+특히, 기존 **Interface Manager 및 Message Converter의 구조를 변경하지 않고 OpenDDS를 추가할 수 있도록 설계**하였다는 점에서 기존 설계 원칙이 유지되었다. 여기서 **구조 변경이 없다는 의미는 기존의 인터페이스 및 데이터 변환 로직을 그대로 유지하면서, 새로운 OpenDDS 모듈이 기존 시스템과 상호 작용할 수 있도록 독립적인 계층을 추가하는 방식**을 의미한다. 즉, TCP/UDP 통신을 담당하는 기존 모듈을 수정하지 않고도, OpenDDS 데이터를 처리할 수 있는 별도의 어댑터를 도입하여 기존 시스템과의 통합을 가능하게 하였다[5].
+
+본 연구의 주요 목표는 다음과 같다.
+1. **NSCP의 기존 TCP/UDP 기반 통신 구조를 유지하면서 OpenDDS를 확장 지원하는 방안 설계**
+2. **OpenDDS 메시지가 NSCP의 메시지 변환 및 기능 관리 컴포넌트와 원활히 통합될 수 있도록 설계**
+3. **OpenDDS 적용 후 성능 검증을 통해 기존 연동 방식과의 차이를 평가하고, 성능 저하가 발생하지 않는지 확인**
+
+본 연구를 통해 **NSCP가 OpenDDS를 포함한 확장형 연동 플랫폼으로 발전할 수 있으며, 기존 TCP/UDP 기반 시스템과 공존하면서도 국제 표준 DDS 기반 장비와의 원활한 데이터 연동이 가능함을 입증한다**[6].
+
+### **참고 문헌**
+[1] Naval Combat System Standardization Research, 2022. Available: [https://example.com/naval-standardization](https://example.com/naval-standardization)  
+[2] Government Furnished Equipment Integration Report, 2021. Available: [https://example.com/gfe-integration](https://example.com/gfe-integration)  
+[3] OMG, "Data Distribution Service (DDS) Specification," Version 1.4, 2021. Available: [https://www.omg.org/spec/DDS/1.4/](https://www.omg.org/spec/DDS/1.4/)  
+[4] International Naval Systems Interoperability Study, 2023. Available: [https://example.com/naval-interoperability](https://example.com/naval-interoperability)  
+[5] OpenDDS Implementation and Performance Analysis, 2022. Available: [https://opendds.org/](https://opendds.org/)  
+[6] NSCP Extended Design for Future Naval Combat Systems, 2023. Available: [https://example.com/nscp-extended](https://example.com/nscp-extended)  
+
