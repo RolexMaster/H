@@ -1,0 +1,8 @@
+송신 관점에서는 주로 CDssInterfaceManager가 송신 제어의 중심에 위치한다. 실제 송신 대상이 되는 데이터는 CDataManager를 통해 관리되며, 송신 시점과 대상 결정은 CDssInterfaceManager가 판단하여 수행한다. 이 과정에서 XXXTypeSupportImpl, XXXTypeSupportC, XXXC 파일들은 각 토픽(topic)별로 생성되며, CDataManager는 이를 인클루드하여 해당 토픽에 대한 객체를 생성하고 송신을 수행한다. 이를 통해 시스템은 OpenDDS 퍼블리시-서브스크라이브(pub-sub) 구조에서 유연하게 다수의 토픽을 관리하고, 각각의 토픽에 대해 독립적인 데이터 송신이 가능하다. 이러한 설계는 토픽별 확장성과 재사용성을 높이는 데 효과적이다.
+
+
+
+
+
+
+
