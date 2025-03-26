@@ -1,0 +1,3 @@
+GfeInterfaceManager는 PasInterfaceManager를 상속받아 TCP, UDP, Serial과 같은 다양한 통신 방식을 처리하도록 구성되어 있었다. 이후 시스템 요구사항이 변경되어 DSS 통신 방식을 추가해야 하는 상황이 발생했지만, 기존의 PasInterfaceManager나 GfeInterfaceManager 클래스를 수정하지 않고, 새로운 클래스로서 DssInterfaceManager를 독립적으로 추가하여 통신 방식을 확장하였다.
+
+이러한 접근은 **OCP(Open-Closed Principle, 개방-폐쇄 원칙)**을 잘 반영한 사례로 볼 수 있다. 기존 코드의 안정성을 유지하면서도, 새로운 기능(DSS 통신 방식)을 기존 클래스의 변경 없이 확장함으로써, 시스템의 유연성과 유지보수성을 확보할 수 있었다. 즉, 기존 설계를 기반으로 한 구조적 확장을 통해 기능 확장에는 열려 있고, 코드 변경에는 닫혀 있는 구조를 실현한 것이다.
