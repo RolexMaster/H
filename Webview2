@@ -1,0 +1,56 @@
+#include <WebView2.h>
+#include <wrl.h>
+using namespace Microsoft::WRL;
+
+ComPtr<ICoreWebView2> m_webView;
+ComPtr<ICoreWebView2Controller> m_webViewController;
+
+BOOL CMyDialog::OnInitDialog()
+{
+    CDialogEx::OnInitDialog();
+
+    HRESULT hr = CreateCoreWebView2EnvironmentWithDetails(
+        nullptr, nullptr, nullptr,
+        Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+            [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+
+                // 콜백 진입 확인
+                AfxMessageBox(L"1단계: WebView2 환경 생성 콜백 진입!");
+
+                if (!env) {
+                    AfxMessageBox(L"env가 null입니다.");
+                    return E_FAIL;
+                }
+
+                env->CreateCoreWebView2Controller(this->GetSafeHwnd(),
+                    Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+                        [this](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+
+                            AfxMessageBox(L"2단계: WebView2 컨트롤러 생성 콜백 진입!");
+
+                            if (controller == nullptr) {
+                                AfxMessageBox(L"컨트롤러가 null입니다.");
+                                return E_FAIL;
+                            }
+
+                            m_webViewController = controller;
+                            controller->get_CoreWebView2(&m_webView);
+
+                            RECT bounds;
+                            GetClientRect(&bounds);
+                            m_webViewController->put_Bounds(bounds);
+
+                            m_webView->Navigate(L"https://www.bing.com");
+
+                            return S_OK;
+                        }).Get());
+
+                return S_OK;
+            }).Get());
+
+    if (FAILED(hr)) {
+        AfxMessageBox(L"CreateCoreWebView2EnvironmentWithDetails 호출 자체가 실패했습니다.");
+    }
+
+    return TRUE;
+}
