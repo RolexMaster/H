@@ -1,0 +1,65 @@
+// MFC WebView2 Dialog 예제 코드 (CreateCoreWebView2EnvironmentWithOptions 기반) // WebView2.h 및 WebView2LoaderStatic.lib 필요
+
+#include <WebView2.h> #include <wrl.h> using namespace Microsoft::WRL;
+
+// 헤더에 멤버 추가 ComPtr<ICoreWebView2> m_webView; ComPtr<ICoreWebView2Controller> m_webViewController;
+
+BOOL CMyDialog::OnInitDialog() { CDialogEx::OnInitDialog();
+
+// WebView2 환경 생성 (WithOptions 사용)
+HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
+    nullptr, nullptr, nullptr,
+    Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+        [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+
+            AfxMessageBox(L"1단계: WebView2 환경 생성 콜백 진입!");
+
+            if (!env) {
+                AfxMessageBox(L"env가 null입니다.");
+                return E_FAIL;
+            }
+
+            env->CreateCoreWebView2Controller(this->GetSafeHwnd(),
+                Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+                    [this](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+
+                        AfxMessageBox(L"2단계: WebView2 컨트롤러 생성 콜백 진입!");
+
+                        if (controller == nullptr) {
+                            AfxMessageBox(L"컨트롤러가 null입니다.");
+                            return E_FAIL;
+                        }
+
+                        m_webViewController = controller;
+                        controller->get_CoreWebView2(&m_webView);
+
+                        RECT bounds;
+                        GetClientRect(&bounds);
+                        m_webViewController->put_Bounds(bounds);
+
+                        m_webView->Navigate(L"https://www.bing.com");
+
+                        return S_OK;
+                    }).Get());
+
+            return S_OK;
+        }).Get());
+
+if (FAILED(hr)) {
+    AfxMessageBox(L"CreateCoreWebView2EnvironmentWithOptions 호출 실패");
+}
+
+return TRUE;
+
+}
+
+void CMyDialog::OnSize(UINT nType, int cx, int cy) { CDialogEx::OnSize(nType, cx, cy);
+
+if (m_webViewController) {
+    RECT bounds;
+    GetClientRect(&bounds);
+    m_webViewController->put_Bounds(bounds);
+}
+
+}
+
