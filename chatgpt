@@ -1,0 +1,50 @@
+def build_alert_blocks(
+    title=None,
+    badge=None,
+    texts=None,
+    image=None,
+    table=None
+):
+    blocks = []
+
+    if title:
+        blocks.append({
+            "type": "title",
+            "content": title
+        })
+
+    if badge:
+        blocks.append({
+            "type": "badge",
+            "content": badge
+        })
+
+    if texts:
+        for text in texts:
+            blocks.append({
+                "type": "text",
+                "content": text
+            })
+
+    if image:
+        blocks.append({
+            "type": "image",
+            "content": image
+        })
+
+    if table:
+        table_rows = []
+        for row in table:
+            row_data = []
+            for cell in row:
+                if isinstance(cell, str):
+                    row_data.append({"type": "text", "content": cell})
+                elif isinstance(cell, dict):
+                    row_data.append(cell)
+            table_rows.append(row_data)
+        blocks.append({
+            "type": "table",
+            "content": table_rows
+        })
+
+    return blocks
