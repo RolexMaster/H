@@ -1,0 +1,47 @@
+// MFC WebView2 Dialog 예제 코드 (OnInitDialog 기준) // WebView2.h 및 WebView2LoaderStatic.lib 필요
+
+#include <WebView2.h> #include <wrl.h> using namespace Microsoft::WRL;
+
+// 헤더에 멤버 추가 ComPtr<ICoreWebView2> m_webView; ComPtr<ICoreWebView2Controller> m_webViewController;
+
+BOOL CMyDialog::OnInitDialog() { CDialogEx::OnInitDialog();
+
+// WebView2 환경 생성
+CreateCoreWebView2EnvironmentWithDetails(
+    nullptr, nullptr, nullptr,
+    Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
+        [this](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
+            env->CreateCoreWebView2Controller(this->GetSafeHwnd(),
+                Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
+                    [this](HRESULT result, ICoreWebView2Controller* controller) -> HRESULT {
+                        if (controller != nullptr) {
+                            m_webViewController = controller;
+                            controller->get_CoreWebView2(&m_webView);
+                        }
+
+                        // 창 영역 설정
+                        RECT bounds;
+                        GetClientRect(&bounds);
+                        m_webViewController->put_Bounds(bounds);
+
+                        // URL 이동
+                        m_webView->Navigate(L"https://www.example.com");
+                        return S_OK;
+                    }).Get());
+            return S_OK;
+        }).Get());
+
+return TRUE;
+
+}
+
+void CMyDialog::OnSize(UINT nType, int cx, int cy) { CDialogEx::OnSize(nType, cx, cy);
+
+if (m_webViewController) {
+    RECT bounds;
+    GetClientRect(&bounds);
+    m_webViewController->put_Bounds(bounds);
+}
+
+}
+
