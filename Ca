@@ -1,0 +1,12 @@
+m_webView->CallDevToolsProtocolMethod(
+    L"Storage.clearDataForOrigin",
+    L"{\"origin\":\"*\",\"storageTypes\":\"all\"}",
+    Microsoft::WRL::Callback<ICoreWebView2CallDevToolsProtocolMethodCompletedHandler>(
+        [](HRESULT error, PCWSTR resultJson) -> HRESULT {
+            if (SUCCEEDED(error)) {
+                AfxMessageBox(L"모든 사이트 캐시 삭제 완료!");
+            } else {
+                AfxMessageBox(L"캐시 삭제 실패!");
+            }
+            return S_OK;
+        }).Get());
