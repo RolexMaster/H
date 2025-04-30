@@ -1,0 +1,102 @@
+from flask import Flask, Response, request, jsonify
+import cv2
+import threading
+import time
+
+app = Flask(__name__)
+
+# 전역 상태
+current_video_path = None
+video_lock = threading.Lock()
+
+broadcast_thread = None
+broadcast_frame = None
+broadcast_fps = 30
+last_frame = None
+
+def broadcast_video():
+    global broadcast_frame, broadcast_fps, last_frame
+    cap = None
+    prev_path = None
+
+    while True:
+        with video_lock:
+            path = current_video_path
+
+        # 영상이 없으면 대기
+        if not path:
+            time.sleep(0.1)
+            continue
+
+        # 영상이 바뀌었으면 새로 로딩
+        if path != prev_path:
+            if cap:
+                cap.release()
+            cap = cv2.VideoCapture(path)
+            if not cap.isOpened():
+                print(f"Cannot open {path}")
+                time.sleep(1)
+                continue
+            broadcast_fps = cap.get(cv2.CAP_PROP_FPS) or 30
+            prev_path = path
+            print(f"Broadcasting {path} at {broadcast_fps} FPS")
+
+        # 프레임 읽기
+        ret, frame = cap.read()
+        if not ret:
+            # 영상 끝났으면 마지막 프레임 유지
+            if last_frame is not None:
+                frame = last_frame
+            else:
+                time.sleep(0.1)
+                continue
+        else:
+            last_frame = frame
+
+        # 인코딩
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            continue
+        broadcast_frame = buffer.tobytes()
+
+        time.sleep(1.0 / broadcast_fps)
+
+def generate_frames():
+    while True:
+        if broadcast_frame is None:
+            time.sleep(0.1)
+            continue
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + broadcast_frame + b'\r\n')
+        time.sleep(1.0 / broadcast_fps)
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@app.route('/select_video', methods=['GET'])
+def select_video():
+    global current_video_path
+
+    video_path = request.args.get('path')
+    if not video_path:
+        return jsonify({"error": "No video path provided"}), 400
+
+    try:
+        with open(video_path, 'rb'):
+            pass
+    except Exception as e:
+        return jsonify({"error": f"Cannot open video file: {str(e)}"}), 400
+
+    with video_lock:
+        current_video_path = video_path
+
+    return jsonify({"message": f"Video switched to: {video_path}"}), 200
+
+if __name__ == '__main__':
+    # 방송 스레드 실행
+    broadcast_thread = threading.Thread(target=broadcast_video, daemon=True)
+    broadcast_thread.start()
+
+    # Flask 서버 실행
+    app.run(host='0.0.0.0', port=5000, threaded=True)
