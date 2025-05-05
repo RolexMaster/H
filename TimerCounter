@@ -1,0 +1,21 @@
+import time
+
+class TimerCounter:
+    def __init__(self):
+        self.start_time = time.time()
+        self.last_count = -1
+
+    def get_count(self):
+        # 현재 시간에서 시작 시간을 뺀 후 정수로 변환 (초 단위)
+        elapsed = int(time.time() - self.start_time)
+        if elapsed > self.last_count:
+            self.last_count = elapsed
+        return self.last_count
+
+# 예제 사용
+if __name__ == "__main__":
+    counter = TimerCounter()
+    while True:
+        current = counter.get_count()
+        print(f"현재 카운트: {current}초")
+        time.sleep(0.3)  # 주기적으로 호출한다고 가정 (1초보다 짧게 호출)
