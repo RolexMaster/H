@@ -1,7 +1,6 @@
 import tkinter as tk
 import time
 import ctypes
-import threading
 from ctypes import wintypes
 
 def get_monitors_winapi():
@@ -32,64 +31,59 @@ def get_monitors_winapi():
     return monitors
 
 class FadeOverlay:
-    def __init__(self, monitor, max_opacity=0.9, steps=30, delay=50, duration_sec=3):
+    def __init__(self, root, monitor, max_opacity=0.9, steps=30, delay=50, duration_sec=3):
+        self.root = root
         self.monitor = monitor
         self.max_opacity = max_opacity
         self.steps = steps
         self.delay = delay
         self.duration_sec = duration_sec
 
-        self.root = tk.Tk()
-        self.root.overrideredirect(True)
-        self.root.geometry(f"{monitor['width']}x{monitor['height']}+{monitor['x']}+{monitor['y']}")
-        self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", 0.0)
-        self.root.configure(bg="black")
+        self.win = tk.Toplevel(self.root)
+        self.win.overrideredirect(True)
+        self.win.geometry(f"{monitor['width']}x{monitor['height']}+{monitor['x']}+{monitor['y']}")
+        self.win.attributes("-topmost", True)
+        self.win.attributes("-alpha", 0.0)
+        self.win.configure(bg="black")
 
-    def fade_in(self):
-        for i in range(self.steps + 1):
-            alpha = (i / self.steps) * self.max_opacity
-            self.root.attributes("-alpha", alpha)
-            self.root.update()
-            time.sleep(self.delay / 1000)
+    def start(self):
+        self.fade_in(0)
 
-    def fade_out(self):
-        for i in reversed(range(self.steps + 1)):
-            alpha = (i / self.steps) * self.max_opacity
-            self.root.attributes("-alpha", alpha)
-            self.root.update()
-            time.sleep(self.delay / 1000)
+    def fade_in(self, step):
+        if step > self.steps:
+            self.win.after(int(self.duration_sec * 1000), lambda: self.fade_out(self.steps))
+            return
+        alpha = (step / self.steps) * self.max_opacity
+        self.win.attributes("-alpha", alpha)
+        self.win.after(self.delay, lambda: self.fade_in(step + 1))
 
-    def run(self):
-        self.fade_in()
-        time.sleep(self.duration_sec)
-        self.fade_out()
-        self.root.destroy()
-
-    def show(self):
-        threading.Thread(target=self.run, daemon=True).start()
-        self.root.mainloop()
+    def fade_out(self, step):
+        if step < 0:
+            self.win.destroy()
+            return
+        alpha = (step / self.steps) * self.max_opacity
+        self.win.attributes("-alpha", alpha)
+        self.win.after(self.delay, lambda: self.fade_out(step - 1))
 
 def show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.85, steps=40, delay=30):
     monitors = get_monitors_winapi()
-    overlays = []
+    root = tk.Tk()
+    root.withdraw()  # 루트 창 숨김
 
+    overlays = []
     for monitor in monitors:
         overlay = FadeOverlay(
+            root,
             monitor,
             max_opacity=max_opacity,
             steps=steps,
             delay=delay,
             duration_sec=duration_sec
         )
+        overlay.start()
         overlays.append(overlay)
 
-    # 모든 오버레이를 각각의 스레드로 실행
-    for overlay in overlays:
-        threading.Thread(target=overlay.show, daemon=True).start()
-
-    # 첫 overlay 기준으로 전체 프로세스 유지
-    overlays[0].root.mainloop()
+    root.mainloop()
 
 # 실행
 if __name__ == "__main__":
