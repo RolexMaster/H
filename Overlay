@@ -1,34 +1,86 @@
 import tkinter as tk
 import time
+import ctypes
+from ctypes import wintypes
 
-class BlackFadeOverlay:
-    def __init__(self, max_opacity=0.9, steps=30, delay=50):
-        self.max_opacity = max_opacity  # 최종 어둠 정도 (0.0~1.0)
-        self.steps = steps              # 점진 단계 수
-        self.delay = delay              # 각 단계 간 지연(ms)
+# Windows API로 다중 모니터 정보 가져오기
+def get_monitors_winapi():
+    monitors = []
+
+    def callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
+        r = lprcMonitor.contents
+        monitors.append({
+            "x": r.left,
+            "y": r.top,
+            "width": r.right - r.left,
+            "height": r.bottom - r.top
+        })
+        return 1
+
+    MONITORENUMPROC = ctypes.WINFUNCTYPE(
+        ctypes.c_int,
+        wintypes.HMONITOR,
+        wintypes.HDC,
+        ctypes.POINTER(wintypes.RECT),
+        wintypes.LPARAM
+    )
+
+    ctypes.windll.user32.EnumDisplayMonitors(
+        0, 0, MONITORENUMPROC(callback), 0
+    )
+
+    return monitors
+
+# 오버레이 창
+class FadeOverlay:
+    def __init__(self, monitor, max_opacity=0.9, steps=30, delay=50):
+        self.monitor = monitor
+        self.max_opacity = max_opacity
+        self.steps = steps
+        self.delay = delay
 
         self.root = tk.Tk()
-        self.root.attributes("-fullscreen", True)
+        self.root.overrideredirect(True)
+        self.root.geometry(f"{monitor['width']}x{monitor['height']}+{monitor['x']}+{monitor['y']}")
         self.root.attributes("-topmost", True)
-        self.root.attributes("-alpha", 0.0)  # 처음에는 투명
+        self.root.attributes("-alpha", 0.0)
         self.root.configure(bg="black")
-        self.root.bind("<Escape>", self.close)
 
     def fade_in(self):
         for i in range(self.steps + 1):
             alpha = (i / self.steps) * self.max_opacity
             self.root.attributes("-alpha", alpha)
             self.root.update()
-            time.sleep(self.delay / 1000)  # ms를 초로 변환
+            time.sleep(self.delay / 1000)
 
-    def show(self):
+    def fade_out(self):
+        for i in reversed(range(self.steps + 1)):
+            alpha = (i / self.steps) * self.max_opacity
+            self.root.attributes("-alpha", alpha)
+            self.root.update()
+            time.sleep(self.delay / 1000)
+
+    def run_fade_cycle(self, duration_sec):
         self.fade_in()
-        self.root.mainloop()
-
-    def close(self, event=None):
+        time.sleep(duration_sec)
+        self.fade_out()
         self.root.destroy()
+
+# 전체 실행 함수
+def show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.9, steps=30, delay=50):
+    monitors = get_monitors_winapi()
+    overlays = []
+
+    for monitor in monitors:
+        overlay = FadeOverlay(monitor, max_opacity, steps, delay)
+        overlays.append(overlay)
+
+    # 각 모니터마다 fade 작업 실행
+    for overlay in overlays:
+        overlay.root.after(0, lambda o=overlay: o.run_fade_cycle(duration_sec))
+
+    overlays[0].root.mainloop()
 
 # 사용 예시
 if __name__ == "__main__":
-    overlay = BlackFadeOverlay(max_opacity=0.85, steps=50, delay=30)
-    overlay.show()
+    show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.85, steps=40, delay=30)
