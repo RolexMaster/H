@@ -1,0 +1,25 @@
+import screen_brightness_control as sbc
+import time
+
+class BrightnessController:
+    def __init__(self, step=5, delay=0.1):
+        self.original_brightness = sbc.get_brightness(display=0)[0]
+        self.current_brightness = self.original_brightness
+        self.step = step
+        self.delay = delay
+
+    def dim_slowly(self, target=10):
+        """모니터 밝기를 천천히 낮춤"""
+        print(f"밝기를 {self.current_brightness}% → {target}%로 천천히 낮춥니다.")
+        for b in range(self.current_brightness, target - 1, -self.step):
+            sbc.set_brightness(b)
+            time.sleep(self.delay)
+        self.current_brightness = sbc.get_brightness(display=0)[0]
+
+    def restore(self):
+        """밝기를 원래대로 복원"""
+        print(f"밝기를 {self.current_brightness}% → {self.original_brightness}%로 복원합니다.")
+        for b in range(self.current_brightness, self.original_brightness + 1, self.step):
+            sbc.set_brightness(b)
+            time.sleep(self.delay)
+        self.current_brightness = self.original_brightness
