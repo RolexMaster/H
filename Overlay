@@ -3,6 +3,7 @@ import time
 import ctypes
 from ctypes import wintypes
 
+# Windows API를 사용하여 모든 모니터의 해상도 및 위치 가져오기
 def get_monitors_winapi():
     monitors = []
 
@@ -30,9 +31,16 @@ def get_monitors_winapi():
 
     return monitors
 
+# 페이드 오버레이 클래스
 class FadeOverlay:
+    active_count = 0      # 현재 열려있는 오버레이 수
+    root_ref = None       # tkinter 루트 윈도우 참조
+
     def __init__(self, root, monitor, max_opacity=0.9, steps=30, delay=50, duration_sec=3):
         self.root = root
+        FadeOverlay.root_ref = root
+        FadeOverlay.active_count += 1
+
         self.monitor = monitor
         self.max_opacity = max_opacity
         self.steps = steps
@@ -60,17 +68,20 @@ class FadeOverlay:
     def fade_out(self, step):
         if step < 0:
             self.win.destroy()
+            FadeOverlay.active_count -= 1
+            if FadeOverlay.active_count == 0:
+                FadeOverlay.root_ref.destroy()  # 마지막 창이면 이벤트 루프 종료
             return
         alpha = (step / self.steps) * self.max_opacity
         self.win.attributes("-alpha", alpha)
         self.win.after(self.delay, lambda: self.fade_out(step - 1))
 
+# 전체 실행 함수
 def show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.85, steps=40, delay=30):
     monitors = get_monitors_winapi()
     root = tk.Tk()
     root.withdraw()  # 루트 창 숨김
 
-    overlays = []
     for monitor in monitors:
         overlay = FadeOverlay(
             root,
@@ -81,10 +92,5 @@ def show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.85, steps=40, d
             duration_sec=duration_sec
         )
         overlay.start()
-        overlays.append(overlay)
 
     root.mainloop()
-
-# 실행
-if __name__ == "__main__":
-    show_fade_overlay_all_monitors(duration_sec=3, max_opacity=0.85, steps=40, delay=30)
