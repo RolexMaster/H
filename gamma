@@ -1,14 +1,13 @@
 import ctypes
 import time
 
-class GammaController:
-    def __init__(self):
-        # 디스플레이 DC 가져오기
+class GammaFadeController:
+    def __init__(self, delay=0.05):
         self.hdc = ctypes.windll.user32.GetDC(0)
         self.original_gamma = self._get_gamma_ramp()
+        self.delay = delay
 
     def _get_gamma_ramp(self):
-        """현재 감마 램프 값 저장"""
         ramp = (ctypes.c_ushort * 256 * 3)()
         ctypes.windll.gdi32.GetDeviceGammaRamp(self.hdc, ctypes.byref(ramp))
         return ramp
@@ -16,25 +15,37 @@ class GammaController:
     def _set_gamma_ramp(self, ramp):
         ctypes.windll.gdi32.SetDeviceGammaRamp(self.hdc, ctypes.byref(ramp))
 
-    def set_black_screen(self):
-        """감마 값을 0으로 설정해서 화면을 검게 만듦"""
+    def _generate_ramp(self, factor):
         ramp = (ctypes.c_ushort * 256 * 3)()
         for i in range(256):
-            value = 0  # 완전히 어둡게
+            value = int(i * 256 * factor)
+            value = min(max(value, 0), 65535)
             ramp[0][i] = value
             ramp[1][i] = value
             ramp[2][i] = value
-        self._set_gamma_ramp(ramp)
+        return ramp
 
-    def restore_gamma(self):
-        """기존 감마 값 복원"""
-        self._set_gamma_ramp(self.original_gamma)
+    def fade_to_black(self, steps=20):
+        """서서히 화면 어둡게"""
+        print("화면을 점진적으로 어둡게 만드는 중...")
+        for i in reversed(range(1, steps + 1)):
+            factor = i / steps
+            ramp = self._generate_ramp(factor)
+            self._set_gamma_ramp(ramp)
+            time.sleep(self.delay)
 
-# 사용 예
+    def restore(self, steps=20):
+        """서서히 원래 밝기로 복원"""
+        print("화면 밝기를 복원하는 중...")
+        for i in range(1, steps + 1):
+            factor = i / steps
+            ramp = self._generate_ramp(factor)
+            self._set_gamma_ramp(ramp)
+            time.sleep(self.delay)
+
+# 예제
 if __name__ == "__main__":
-    gc = GammaController()
-    gc.set_black_screen()
-    print("화면을 검게 만들었습니다. 5초 후 복원됩니다.")
-    time.sleep(5)
-    gc.restore_gamma()
-    print("복원 완료")
+    gf = GammaFadeController(delay=0.05)
+    gf.fade_to_black(steps=30)
+    time.sleep(2)
+    gf.restore(steps=30)
