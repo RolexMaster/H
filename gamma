@@ -1,0 +1,40 @@
+import ctypes
+import time
+
+class GammaController:
+    def __init__(self):
+        # 디스플레이 DC 가져오기
+        self.hdc = ctypes.windll.user32.GetDC(0)
+        self.original_gamma = self._get_gamma_ramp()
+
+    def _get_gamma_ramp(self):
+        """현재 감마 램프 값 저장"""
+        ramp = (ctypes.c_ushort * 256 * 3)()
+        ctypes.windll.gdi32.GetDeviceGammaRamp(self.hdc, ctypes.byref(ramp))
+        return ramp
+
+    def _set_gamma_ramp(self, ramp):
+        ctypes.windll.gdi32.SetDeviceGammaRamp(self.hdc, ctypes.byref(ramp))
+
+    def set_black_screen(self):
+        """감마 값을 0으로 설정해서 화면을 검게 만듦"""
+        ramp = (ctypes.c_ushort * 256 * 3)()
+        for i in range(256):
+            value = 0  # 완전히 어둡게
+            ramp[0][i] = value
+            ramp[1][i] = value
+            ramp[2][i] = value
+        self._set_gamma_ramp(ramp)
+
+    def restore_gamma(self):
+        """기존 감마 값 복원"""
+        self._set_gamma_ramp(self.original_gamma)
+
+# 사용 예
+if __name__ == "__main__":
+    gc = GammaController()
+    gc.set_black_screen()
+    print("화면을 검게 만들었습니다. 5초 후 복원됩니다.")
+    time.sleep(5)
+    gc.restore_gamma()
+    print("복원 완료")
