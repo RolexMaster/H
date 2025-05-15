@@ -1,0 +1,81 @@
+import cv2
+import numpy as np
+import gi
+import time
+import argparse
+gi.require_version("Gst", "1.0")
+from gi.repository import Gst, GLib
+
+import threading
+
+# GStreamer 초기화
+Gst.init(None)
+
+# 입력 인자 처리
+parser = argparse.ArgumentParser(description="RTSP 재송출 서버 (텍스트/박스 오버레이 포함)")
+parser.add_argument("source", help="입력 영상 (RTSP 주소 또는 파일 경로)")
+parser.add_argument("--port", type=int, default=5000, help="UDP 포트 번호 (기본: 5000)")
+args = parser.parse_args()
+
+# 영상 크기 및 FPS 설정
+WIDTH, HEIGHT, FPS = 640, 480, 25
+FRAME_DURATION = Gst.SECOND // FPS
+
+# 출력 GStreamer 파이프라인 (UDP 전송)
+gst_pipeline = (
+    f'appsrc name=src is-live=true block=true format=TIME '
+    f'caps=video/x-raw,format=BGR,width={WIDTH},height={HEIGHT},framerate={FPS}/1 '
+    f'! videoconvert '
+    f'! x264enc tune=zerolatency speed-preset=ultrafast bitrate=800 key-int-max=30 '
+    f'! rtph264pay config-interval=1 pt=96 '
+    f'! udpsink host=127.0.0.1 port={args.port}'
+)
+
+# GStreamer 파이프라인 생성
+pipeline = Gst.parse_launch(gst_pipeline)
+appsrc = pipeline.get_by_name("src")
+pipeline.set_state(Gst.State.PLAYING)
+
+# GStreamer 메인 루프 시작
+def gst_mainloop():
+    loop = GLib.MainLoop()
+    loop.run()
+
+threading.Thread(target=gst_mainloop, daemon=True).start()
+
+# OpenCV로 입력 영상 열기
+cap = cv2.VideoCapture(args.source)
+
+timestamp = 0
+box_x = 0
+direction = 1
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # 리사이즈
+    frame = cv2.resize(frame, (WIDTH, HEIGHT))
+
+    # 동적 텍스트 및 박스 그리기
+    text = time.strftime("Time: %H:%M:%S")
+    cv2.putText(frame, text, (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+    cv2.rectangle(frame, (box_x, 100), (box_x+100, 200), (0, 0, 255), 2)
+
+    box_x += 5 * direction
+    if box_x < 0 or box_x + 100 > WIDTH:
+        direction *= -1
+
+    # GStreamer로 프레임 push
+    data = frame.tobytes()
+    buf = Gst.Buffer.new_allocate(None, len(data), None)
+    buf.fill(0, data)
+    buf.pts = buf.dts = timestamp
+    buf.duration = FRAME_DURATION
+    timestamp += FRAME_DURATION
+
+    appsrc.emit("push-buffer", buf)
+
+cap.release()
+pipeline.set_state(Gst.State.NULL)
