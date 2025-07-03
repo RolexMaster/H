@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<User name="Kim_Commander">
+    <RoleBtn name="MainRoleA">
+        <FuncBtn name="ButtonA" pos="1" msgId="1001" show="O"/>
+        <FuncBtn name="ButtonB" pos="2" msgId="1002" show="X">
+            <FuncBtn name="ButtonB_Sub1" pos="1" msgId="2001" show="O"/>
+            <FuncBtn name="ButtonB_Sub2" pos="2" msgId="2002" show="X"/>
+        </FuncBtn>
+    </RoleBtn>
+</User>
