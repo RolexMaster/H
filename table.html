@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>XML 동적 테이블 에디터</title>
+  <link href="https://unpkg.com/tabulator-tables@5.6.2/dist/css/tabulator.min.css" rel="stylesheet">
+</head>
+<body>
+  <h3>XML 동적 테이블 에디터</h3>
+  <div id="xml-table"></div>
+  <script src="https://unpkg.com/tabulator-tables@5.6.2/dist/js/tabulator.min.js"></script>
+  <script>
+    const tableData = {{ data|tojson }};
+    const columns = {{ columns|tojson }};
+    const table = new Tabulator("#xml-table", {
+      data: tableData,
+      columns: columns,
+      layout: "fitColumns",
+    });
+  </script>
+</body>
+</html>
