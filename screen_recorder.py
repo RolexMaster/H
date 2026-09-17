@@ -754,7 +754,7 @@ class ScreenRecorderApp:
         ttk.Label(main, textvariable=self.status_var).grid(
             row=7, column=1, columnspan=2, sticky="w"
         )
-        ttk.Label(main, text="영상 시간:").grid(row=8, column=0, sticky="w", pady=(6, 0))
+        ttk.Label(main, text="녹화 경과 시간:").grid(row=8, column=0, sticky="w", pady=(6, 0))
         ttk.Label(
             main,
             textvariable=self.elapsed_time_var,
@@ -1502,9 +1502,8 @@ class ScreenRecorderApp:
     def _update_elapsed_time(self) -> None:
         if self.recording_started_at is None:
             return
-        self.elapsed_time_var.set(
-            self._format_elapsed_time(self.recorder.output_seconds)
-        )
+        elapsed = time.monotonic() - self.recording_started_at
+        self.elapsed_time_var.set(self._format_elapsed_time(elapsed))
 
     def _selected_monitors(self) -> list[MonitorConfig]:
         return [
@@ -1636,12 +1635,12 @@ class ScreenRecorderApp:
             return
 
         self.stop_requested = False
-        self.recording_started_at = time.monotonic()
+        self.recording_started_at = self.recorder.launched_at or time.monotonic()
         self.recording_wall_seconds = None
         self.elapsed_time_var.set("00:00:00")
         self._set_recording_controls(True)
         self.status_var.set(
-            f"녹화 중 (영상 시간 기준) - Monitor {selected_text} / {encoder} / {output_path.name}"
+            f"녹화 중 - Monitor {selected_text} / {encoder} / {output_path.name}"
         )
 
     def _stop_recording(self) -> None:
@@ -1699,7 +1698,6 @@ class ScreenRecorderApp:
                         f"저장 완료 - {output_path.name if output_path else ''}"
                     )
                 else:
-                    self.elapsed_time_var.set(self._format_elapsed_time(duration))
                     launched_at = self.recorder.launched_at
                     first_file = self.recorder.first_file_at
                     first_output = self.recorder.first_output_at
