@@ -204,6 +204,10 @@ class FFmpegRecorder:
         self.launched_at: float | None = None
         self.first_file_at: float | None = None
         self.first_output_at: float | None = None
+        self.capture_started_at: float | None = None
+        self.first_capture_epochs: dict[int, float] = {}
+        self.expected_monitors = 0
+        self.wallclock_to_monotonic = 0.0
 
     @property
     def is_running(self) -> bool:
@@ -267,6 +271,7 @@ class FFmpegRecorder:
         command = [
             str(self.ffmpeg_path),
             "-hide_banner",
+            "-copyts",
             "-loglevel",
             "info",
             "-nostats",
@@ -306,7 +311,13 @@ class FFmpegRecorder:
             padded_width = self._even(monitor.width)
             label = f"v{index}"
             filter_parts.append(
-                f"[{index}:v]setpts=PTS-STARTPTS,"
+                f"[{index}:v]split=2[record{index}][probe{index}]"
+            )
+            filter_parts.append(
+                f"[probe{index}]select=not(n),showinfo@first{index},nullsink"
+            )
+            filter_parts.append(
+                f"[record{index}]setpts=PTS-STARTPTS,"
                 f"pad={padded_width}:{canvas_height}:0:(oh-ih)/2:color=black,"
                 f"setsar=1[{label}]"
             )
@@ -362,9 +373,13 @@ class FFmpegRecorder:
         self.output_seconds = 0.0
         self.first_file_at = None
         self.first_output_at = None
+        self.capture_started_at = None
+        self.first_capture_epochs.clear()
+        self.expected_monitors = len(monitors)
         self.encoder = self.choose_encoder(monitors)
         command = self.build_command(monitors, output_path, self.encoder)
 
+        self.wallclock_to_monotonic = time.monotonic() - time.time()
         self.launched_at = time.monotonic()
         self.process = subprocess.Popen(
             command,
@@ -389,7 +404,21 @@ class FFmpegRecorder:
             return
         for line in process.stderr:
             clean_line = line.rstrip()
-            if clean_line.startswith("out_time_us="):
+            first_frame = re.search(
+                r"\[showinfo@first(\d+)\s+@[^]]+\]\s+n:\s*0\s+pts:.*?"
+                r"\spts_time:([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)",
+                clean_line,
+            )
+            if first_frame is not None:
+                index = int(first_frame.group(1))
+                if index < self.expected_monitors and index not in self.first_capture_epochs:
+                    self.first_capture_epochs[index] = float(first_frame.group(2))
+                    if len(self.first_capture_epochs) == self.expected_monitors:
+                        first_composite_frame = max(self.first_capture_epochs.values())
+                        self.capture_started_at = (
+                            first_composite_frame + self.wallclock_to_monotonic
+                        )
+            elif clean_line.startswith("out_time_us="):
                 try:
                     microseconds = int(clean_line.partition("=")[2])
                 except ValueError:
@@ -398,7 +427,11 @@ class FFmpegRecorder:
                     if self.first_output_at is None:
                         self.first_output_at = time.monotonic()
                     self.output_seconds = max(self.output_seconds, microseconds / 1_000_000)
-            elif clean_line and not re.match(r"^[a-z][a-z0-9_]*=", clean_line):
+            elif (
+                clean_line
+                and "[showinfo@first" not in clean_line
+                and not re.match(r"^[a-z][a-z0-9_]*=", clean_line)
+            ):
                 self.stderr_tail.append(clean_line)
 
     def request_stop(self) -> None:
@@ -621,6 +654,7 @@ class ScreenRecorderApp:
         self.close_after_stop = False
         self.recording_started_at: float | None = None
         self.recording_wall_seconds: float | None = None
+        self.recording_status_text = ""
         self.animation_step = 0
         self.monitor_canvas: tk.Canvas | None = None
         self.monitor_image: tk.PhotoImage | None = None
@@ -1501,7 +1535,12 @@ class ScreenRecorderApp:
 
     def _update_elapsed_time(self) -> None:
         if self.recording_started_at is None:
-            return
+            if self.stop_requested or not self.recorder.is_running:
+                return
+            self.recording_started_at = self.recorder.capture_started_at
+            if self.recording_started_at is None:
+                return
+            self.status_var.set(self.recording_status_text)
         elapsed = time.monotonic() - self.recording_started_at
         self.elapsed_time_var.set(self._format_elapsed_time(elapsed))
 
@@ -1635,20 +1674,26 @@ class ScreenRecorderApp:
             return
 
         self.stop_requested = False
-        self.recording_started_at = self.recorder.launched_at or time.monotonic()
+        self.recording_started_at = None
         self.recording_wall_seconds = None
         self.elapsed_time_var.set("00:00:00")
         self._set_recording_controls(True)
-        self.status_var.set(
+        self.recording_status_text = (
             f"녹화 중 - Monitor {selected_text} / {encoder} / {output_path.name}"
         )
+        self.status_var.set("화면 캡처 준비 중...")
 
     def _stop_recording(self) -> None:
         if not self.recorder.is_running or self.stop_requested:
             return
         self._update_elapsed_time()
-        if self.recording_started_at is not None:
-            self.recording_wall_seconds = time.monotonic() - self.recording_started_at
+        origin = (
+            self.recording_started_at
+            or self.recorder.capture_started_at
+            or self.recorder.launched_at
+        )
+        if origin is not None:
+            self.recording_wall_seconds = time.monotonic() - origin
         self.recording_started_at = None
         self.stop_requested = True
         self.stop_button.configure(state="disabled")
@@ -1679,11 +1724,14 @@ class ScreenRecorderApp:
         if finished is not None:
             return_code, output_path = finished
             wall_seconds = self.recording_wall_seconds
-            if wall_seconds is None and self.recording_started_at is not None:
-                wall_seconds = time.monotonic() - self.recording_started_at
+            if wall_seconds is None:
+                origin = self.recording_started_at or self.recorder.capture_started_at
+                if origin is not None:
+                    wall_seconds = time.monotonic() - origin
             self.stop_requested = False
             self.recording_started_at = None
             self.recording_wall_seconds = None
+            self.recording_status_text = ""
             self._set_recording_controls(False)
 
             if return_code == 0:
@@ -1701,6 +1749,7 @@ class ScreenRecorderApp:
                     launched_at = self.recorder.launched_at
                     first_file = self.recorder.first_file_at
                     first_output = self.recorder.first_output_at
+                    first_capture = self.recorder.capture_started_at
                     file_delay = (
                         f"{first_file - launched_at:.3f}s"
                         if launched_at is not None and first_file is not None
@@ -1711,10 +1760,16 @@ class ScreenRecorderApp:
                         if launched_at is not None and first_output is not None
                         else "n/a"
                     )
+                    capture_delay = (
+                        f"{first_capture - launched_at:.3f}s"
+                        if launched_at is not None and first_capture is not None
+                        else "n/a"
+                    )
                     print(
                         f"[RECORD] file={duration:.3f}s "
                         f"wall={wall_seconds if wall_seconds is not None else 0:.3f}s "
-                        f"first_file={file_delay} first_output={output_delay} "
+                        f"first_capture={capture_delay} first_file={file_delay} "
+                        f"first_output={output_delay} "
                         f"encoder={self.recorder.encoder} fps={self.fps}",
                         flush=True,
                     )
